@@ -105,6 +105,7 @@ Docs: https://docs.openclaw.ai
 - Node-host/exec approvals: bind `pnpm dlx` invocations through the approval planner's mutable-script path so the effective runtime command is resolved for approval instead of being left unbound. (#58374)
 - Exec/node hosts: stop forwarding the gateway workspace cwd to remote node exec when no workdir was explicitly requested, so cross-platform node approvals fall back to the node default cwd instead of failing with `SYSTEM_RUN_DENIED`. (#58977) Thanks @Starhappysh.
 - Exec approvals/channels: decouple initiating-surface approval availability from native delivery enablement so Telegram, Slack, and Discord still expose approvals when approvers exist and native target routing is configured separately. (#59776) Thanks @joelnishanth.
+- Telegram/native commands: clean up metadata-driven progress placeholders when replies fall back, edits fail, or local exec approval prompts are suppressed. (#59300) Thanks @jalehman.
 
 ## 2026.4.2
 
