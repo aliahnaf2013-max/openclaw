@@ -24,6 +24,16 @@ Before doing anything else:
 
 Don't ask permission. Just do it.
 
+### Slack Context Recovery
+
+- In Slack conversations, treat short follow-ups like `try again now`, `what was the last thing`, or `do it` as context-dependent by default.
+- If the current turn is ambiguous or the live session does not clearly contain the needed context, recover recent DM or thread history before answering.
+- Prefer this recovery order:
+  1. Current session context
+  2. Recent Slack history for the current DM or thread
+  3. Relevant memory files and long-term memory
+- Do not claim you have lost context until you have tried the available history and memory paths.
+
 ## Memory
 
 You wake up fresh each session. These files are your continuity:
