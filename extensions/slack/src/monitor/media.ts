@@ -10,6 +10,7 @@ import {
   saveMediaBuffer,
 } from "./media.runtime.js";
 export {
+  resolveSlackConversationHistory,
   resetSlackThreadStarterCacheForTest,
   resolveSlackThreadHistory,
   resolveSlackThreadStarter,

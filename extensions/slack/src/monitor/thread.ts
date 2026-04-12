@@ -119,6 +119,11 @@ type SlackRepliesPage = {
   response_metadata?: { next_cursor?: string };
 };
 
+type SlackHistoryPage = {
+  messages?: SlackRepliesPageMessage[];
+  response_metadata?: { next_cursor?: string };
+};
+
 /**
  * Fetches the most recent messages in a Slack thread (excluding the current message).
  * Used to populate thread context when a new thread session starts.
@@ -182,6 +187,74 @@ export async function resolveSlackThreadHistory(params: {
   } catch (err) {
     logVerbose(
       `slack thread history fetch failed channel=${params.channelId} ts=${params.threadTs}: ${formatErrorMessage(err)}`,
+    );
+    return [];
+  }
+}
+
+/**
+ * Fetches recent non-thread Slack conversation history in chronological order.
+ * Used to hydrate top-level direct-message turns when the live session alone
+ * is not enough to recover short follow-up context.
+ */
+export async function resolveSlackConversationHistory(params: {
+  channelId: string;
+  client: SlackWebClient;
+  currentMessageTs?: string;
+  limit?: number;
+}): Promise<SlackThreadMessage[]> {
+  const maxMessages = params.limit ?? 20;
+  if (!Number.isFinite(maxMessages) || maxMessages <= 0) {
+    return [];
+  }
+
+  const fetchLimit = Math.min(200, Math.max(maxMessages, 50));
+  const retained: SlackRepliesPageMessage[] = [];
+  let cursor: string | undefined;
+
+  try {
+    do {
+      const response = (await params.client.conversations.history({
+        channel: params.channelId,
+        limit: fetchLimit,
+        inclusive: false,
+        ...(params.currentMessageTs ? { latest: params.currentMessageTs } : {}),
+        ...(cursor ? { cursor } : {}),
+      })) as SlackHistoryPage;
+
+      for (const msg of response.messages ?? []) {
+        if (!msg.text?.trim() && !msg.files?.length) {
+          continue;
+        }
+        if (params.currentMessageTs && msg.ts === params.currentMessageTs) {
+          continue;
+        }
+        retained.push(msg);
+        if (retained.length >= maxMessages) {
+          return retained.reverse().map((entry) => ({
+            text: entry.text?.trim() ? entry.text : formatSlackFilePlaceholder(entry.files),
+            userId: entry.user,
+            botId: entry.bot_id,
+            ts: entry.ts,
+            files: entry.files,
+          }));
+        }
+      }
+
+      const next = response.response_metadata?.next_cursor;
+      cursor = typeof next === "string" && next.trim().length > 0 ? next.trim() : undefined;
+    } while (cursor);
+
+    return retained.reverse().map((entry) => ({
+      text: entry.text?.trim() ? entry.text : formatSlackFilePlaceholder(entry.files),
+      userId: entry.user,
+      botId: entry.bot_id,
+      ts: entry.ts,
+      files: entry.files,
+    }));
+  } catch (err) {
+    logVerbose(
+      `slack conversation history fetch failed channel=${params.channelId}: ${formatErrorMessage(err)}`,
     );
     return [];
   }
