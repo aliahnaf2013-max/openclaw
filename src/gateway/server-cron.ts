@@ -285,12 +285,16 @@ export function buildGatewayCronService(params: {
     runIsolatedAgentJob: async ({ job, message, abortSignal }) => {
       const { agentId, cfg: runtimeConfig } = resolveCronAgent(job.agentId);
       let sessionKey = `cron:${job.id}`;
+      let isEphemeral = true; // Default cron sessions to ephemeral for cleanup
+
       if (job.sessionTarget.startsWith("session:")) {
         const customSessionId = job.sessionTarget.slice(8).trim();
         if (customSessionId) {
           sessionKey = customSessionId;
+          isEphemeral = false; // Custom sessions are likely intended for persistence
         }
       }
+
       return await runCronIsolatedAgentTurn({
         cfg: runtimeConfig,
         deps: params.deps,
@@ -300,6 +304,8 @@ export function buildGatewayCronService(params: {
         agentId,
         sessionKey,
         lane: "cron",
+        // Ensure the underlying runtime knows this session should be cleaned up
+        isEphemeral,
       });
     },
     sendCronFailureAlert: async ({ job, text, channel, to, mode, accountId }) => {
