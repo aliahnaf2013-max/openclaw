@@ -1,0 +1,50 @@
+when:
+  - event: [push, pull_request]
+
+steps:
+  validate:
+    image: alpine:3.20
+    commands:
+      - test -f Dockerfile
+      - echo "Dockerfile present"
+    when:
+      - event: pull_request
+
+  deploy:
+    image: alpine:3.20
+    environment:
+      DEPLOY_KEY:
+        from_secret: openclaw_vm_ssh_key
+      DEPLOY_HOST:
+        from_secret: openclaw_vm_host
+      JUMP_HOST:
+        from_secret: openclaw_jump_host
+      JUMP_USER:
+        from_secret: openclaw_jump_user
+    commands:
+      - apk add --no-cache openssh-client
+      - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+      - echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+      - chmod 600 ~/.ssh/id_ed25519
+      - ssh-keyscan -H "$JUMP_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+      - |
+        cat > ~/.ssh/config <<EOF
+        Host jump
+          HostName $JUMP_HOST
+          User $JUMP_USER
+          IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+        Host vm
+          HostName $DEPLOY_HOST
+          User ubuntu
+          IdentityFile ~/.ssh/id_ed25519
+          ProxyJump jump
+          StrictHostKeyChecking no
+          UserKnownHostsFile /dev/null
+        EOF
+      - chmod 600 ~/.ssh/config
+      - ssh vm 'bash /home/ubuntu/openclaw-deploy.sh'
+    when:
+      - branch: main
+        event: push
