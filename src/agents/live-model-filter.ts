@@ -14,8 +14,6 @@ const HIGH_SIGNAL_LIVE_MODEL_PRIORITY = [
   "google/gemini-3.1-pro-preview",
   "google/gemini-3-flash-preview",
   "minimax/minimax-m2.7",
-  "openai/gpt-5.2",
-  "openai-codex/gpt-5.2",
   "opencode-go/glm-5",
   "openrouter/ai21/jamba-large-1.7",
   "xai/grok-4-1-fast-non-reasoning",
@@ -23,6 +21,16 @@ const HIGH_SIGNAL_LIVE_MODEL_PRIORITY = [
   "fireworks/accounts/fireworks/routers/kimi-k2p5-turbo",
   "minimax-portal/minimax-m2.7",
 ] as const;
+
+// Stale/unhealthy channel ids — routed through isUnhealthy() gate and excluded from priority list
+export const UNHEALTHY_CHANNEL_SEED = [
+  "openai/gpt-5.2",
+  "openai-codex/gpt-5.2",
+] as const;
+
+export function isUnhealthy(canonicalKey: string): boolean {
+  return (UNHEALTHY_CHANNEL_SEED as readonly string[]).includes(canonicalKey);
+}
 
 export const DEFAULT_HIGH_SIGNAL_LIVE_MODEL_LIMIT = HIGH_SIGNAL_LIVE_MODEL_PRIORITY.length;
 
