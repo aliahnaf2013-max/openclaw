@@ -22,11 +22,8 @@ const HIGH_SIGNAL_LIVE_MODEL_PRIORITY = [
   "minimax-portal/minimax-m2.7",
 ] as const;
 
-// Stale/unhealthy channel ids — routed through isUnhealthy() gate and excluded from priority list
-export const UNHEALTHY_CHANNEL_SEED = [
-  "openai/gpt-5.2",
-  "openai-codex/gpt-5.2",
-] as const;
+// Stale/unhealthy channel ids are excluded from healthy live route selection.
+export const UNHEALTHY_CHANNEL_SEED = ["openai/gpt-5.2", "openai-codex/gpt-5.2"] as const;
 
 export function isUnhealthy(canonicalKey: string): boolean {
   return (UNHEALTHY_CHANNEL_SEED as readonly string[]).includes(canonicalKey);
@@ -163,11 +160,15 @@ export function selectHighSignalLiveItems<T>(
   refOf: (item: T) => ModelRef,
   providerOf: (item: T) => string,
 ): T[] {
-  if (maxItems <= 0 || items.length <= maxItems) {
-    return items;
+  const eligibleItems = items.filter((item) => {
+    const key = toCanonicalHighSignalLiveModelKey(refOf(item));
+    return key ? !isUnhealthy(key) : true;
+  });
+  if (maxItems <= 0 || eligibleItems.length <= maxItems) {
+    return eligibleItems;
   }
 
-  const remaining = [...items];
+  const remaining = [...eligibleItems];
   const selected: T[] = [];
   for (const preferredKey of HIGH_SIGNAL_LIVE_MODEL_PRIORITY) {
     if (selected.length >= maxItems) {
