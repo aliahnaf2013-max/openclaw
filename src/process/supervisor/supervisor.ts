@@ -89,6 +89,30 @@ function resolveElapsedTimeoutReason(params: {
   return elapsedDeadlines[0].reason;
 }
 
+const globalActiveRunsSymbol = Symbol.for("openclaw.supervisor.activeRunsGlobal");
+const exitListenerSymbol = Symbol.for("openclaw.supervisor.exitListenerRegistered");
+
+const activeRunsGlobal = (() => {
+  const g = globalThis as any;
+  if (!g[globalActiveRunsSymbol]) {
+    g[globalActiveRunsSymbol] = new Map<string, ManagedRun>();
+  }
+  return g[globalActiveRunsSymbol] as Map<string, ManagedRun>;
+})();
+
+if (!(globalThis as any)[exitListenerSymbol]) {
+  (globalThis as any)[exitListenerSymbol] = true;
+  process.on("exit", () => {
+    for (const run of activeRunsGlobal.values()) {
+      try {
+        run.cancel("gateway-exit");
+      } catch {
+        // ignore
+      }
+    }
+  });
+}
+
 export function createProcessSupervisor(): ProcessSupervisor {
   const registry = createRunRegistry();
   const active = new Map<string, ActiveRun>();
@@ -225,8 +249,12 @@ export function createProcessSupervisor(): ProcessSupervisor {
         }
       };
 
-      cancelAdapter = (_reason: TerminationReason) => {
+      cancelAdapter = (reason: TerminationReason) => {
         if (settled || forceKillTimer) {
+          return;
+        }
+        if (reason === "gateway-exit") {
+          adapter.kill("SIGKILL");
           return;
         }
         adapter.kill("SIGTERM");
@@ -290,6 +318,7 @@ export function createProcessSupervisor(): ProcessSupervisor {
         clearTimers();
         adapter.dispose();
         active.delete(runId);
+        activeRunsGlobal.delete(runId);
 
         const reason: TerminationReason =
           terminalReason ?? (result.signal != null ? ("signal" as const) : ("exit" as const));
@@ -314,6 +343,7 @@ export function createProcessSupervisor(): ProcessSupervisor {
           settled = true;
           clearTimers();
           active.delete(runId);
+          activeRunsGlobal.delete(runId);
           adapter.dispose();
           registry.finalize(runId, {
             reason: "spawn-error",
@@ -339,6 +369,7 @@ export function createProcessSupervisor(): ProcessSupervisor {
         run: managedRun,
         scopeKey,
       });
+      activeRunsGlobal.set(runId, managedRun);
       return managedRun;
     } catch (err) {
       registry.finalize(runId, {
