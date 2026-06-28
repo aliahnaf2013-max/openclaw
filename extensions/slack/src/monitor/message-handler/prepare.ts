@@ -70,6 +70,7 @@ import { resolveSlackRoomContextHints } from "../room-context.js";
 import { sendMessageSlack } from "../send.runtime.js";
 import { resolveSlackThreadStarter, type SlackThreadStarter } from "../thread.js";
 import { resolveSlackMessageContent } from "./prepare-content.js";
+import { resolveSlackDirectContextData } from "./prepare-direct-context.js";
 import { resolveSlackDmHistoryContext, resolveSlackDmHistoryLimit } from "./prepare-dm-history.js";
 import { resolveSlackRoutingContext } from "./prepare-routing.js";
 import { resolveSlackThreadContextData } from "./prepare-thread-context.js";
@@ -1245,6 +1246,21 @@ export async function prepareSlackMessage(params: {
     envelopeOptions,
     effectiveDirectMedia,
   });
+  const directContextData =
+    isDirectMessage && !isThreadReply
+      ? await resolveSlackDirectContextData({
+          ctx,
+          account,
+          message,
+          senderId,
+          senderName,
+          previousTimestamp,
+          rawBody,
+          envelopeOptions,
+        })
+      : { historyBody: undefined, label: undefined };
+  const supplementalHistoryBody = threadHistoryBody ?? directContextData.historyBody;
+  const supplementalThreadLabel = threadLabel ?? directContextData.label;
 
   // Use direct media (including forwarded attachment media) if available, else thread starter media
   const effectiveMedia = effectiveDirectMedia ?? threadStarterMedia;
@@ -1353,7 +1369,7 @@ export async function prepareSlackMessage(params: {
         mentionSource,
       }),
     },
-  }) satisfies FinalizedMsgContext;
+  });
 
   if (isRoomish && !shouldRequireMention) {
     channelHistory.record({
