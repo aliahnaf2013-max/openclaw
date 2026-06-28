@@ -7,6 +7,8 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 export type AcceptedSessionSpawn = {
   runId: string;
   childSessionKey: string;
+  parentRunId?: string;
+  parentSessionKey?: string;
 };
 
 /** Normalize a tool result that accepted a child session spawn. */
