@@ -1459,6 +1459,8 @@ describe("subscribeEmbeddedAgentSession", () => {
       {
         runId: "run-child",
         childSessionKey: "agent:claude:subagent:child",
+        parentRunId: "run-spawn-side-effect-compaction",
+        parentSessionKey: "test-session",
       },
     ]);
 

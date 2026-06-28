@@ -1166,7 +1166,10 @@ export async function handleToolExecutionEnd(
   );
   // Older/custom event producers omit executionStarted. Treat omission as
   // executed; only an explicit false can prove preparation stopped the call.
-  const executionStarted = evt.executionStarted !== false && !executionPrevented;
+  const executionStarted =
+    evt.executionStarted !== false &&
+    !executionPrevented &&
+    (toolName !== "sessions_spawn" || Boolean(startData));
   const attemptedMutatingAction = callSummary.mutatingAction && executionStarted;
   const attemptedPotentialSideEffect = !callSummary.replaySafe && executionStarted;
   const meta = callSummary.meta;
@@ -1179,11 +1182,15 @@ export async function handleToolExecutionEnd(
     ...(asyncStarted ? { asyncStarted: true, ...asyncTaskIds } : {}),
   });
   const acceptedSessionSpawn =
-    toolName === "sessions_spawn" && !isToolError
+    toolName === "sessions_spawn" && !isToolError && executionStarted && startData
       ? normalizeAcceptedSessionSpawnResult(sanitizedResult)
       : null;
   if (acceptedSessionSpawn) {
-    ctx.state.acceptedSessionSpawns.push(acceptedSessionSpawn);
+    ctx.state.acceptedSessionSpawns.push({
+      ...acceptedSessionSpawn,
+      parentRunId: runId,
+      ...(ctx.params.sessionKey ? { parentSessionKey: ctx.params.sessionKey } : {}),
+    });
   }
   ctx.state.toolMetaById.delete(toolCallId);
   ctx.state.toolSummaryById.delete(toolCallId);

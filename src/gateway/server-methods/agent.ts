@@ -97,6 +97,7 @@ import type { PluginHookSessionEndReason } from "../../plugins/hook-types.js";
 import {
   classifySessionKeyShape,
   isAcpSessionKey,
+  isSubagentSessionKey,
   normalizeAgentId,
   parseAgentSessionKey,
 } from "../../routing/session-key.js";
@@ -585,9 +586,10 @@ function resolveGatewayAgentTaskTrackingMode(params: {
   if (!params.sessionKey?.trim() || params.inputProvenance?.kind === "inter_session") {
     return "none";
   }
-  return params.client?.internal?.agentRunTracking === "plugin_subagent"
-    ? "plugin_subagent"
-    : "cli";
+  const pluginSubagentTracking =
+    params.client?.internal?.agentRunTracking === "plugin_subagent" &&
+    isSubagentSessionKey(params.sessionKey);
+  return pluginSubagentTracking ? "plugin_subagent" : "cli";
 }
 
 async function registerPluginSubagentRunFromGateway(params: {

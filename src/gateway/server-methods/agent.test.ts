@@ -3371,6 +3371,80 @@ describe("gateway agent handler", () => {
     });
   });
 
+  it("does not register plugin SDK subagent tracking for non-subagent session keys", async () => {
+    await withTempDir(
+      { prefix: "openclaw-gateway-plugin-subagent-main-session-" },
+      async (root) => {
+        useTestStateDir(root);
+        resetTaskRegistryForTests();
+        resetSubagentRegistryForTests({ persist: false });
+        const runId = "plugin-subagent-main-session-replay";
+        const sessionKey = "agent:work:main";
+        const cfg = {
+          session: { mainKey: "main", scope: "per-sender" },
+          agents: { list: [{ id: "main", default: true }, { id: "work" }] },
+        };
+        mocks.listAgentIds.mockReturnValue(["main", "work"]);
+        mocks.loadConfigReturn = cfg;
+        mocks.loadSessionEntry.mockReturnValue({
+          cfg,
+          storePath: "/tmp/sessions.json",
+          entry: {
+            sessionId: "plugin-subagent-main-session",
+            updatedAt: Date.now(),
+          },
+          canonicalKey: sessionKey,
+        });
+        mocks.updateSessionStore.mockImplementation(async (_path, updater) => {
+          const store: Record<string, unknown> = {
+            [sessionKey]: {
+              sessionId: "plugin-subagent-main-session",
+              updatedAt: Date.now(),
+            },
+          };
+          return await updater(store);
+        });
+        mocks.agentCommand.mockResolvedValue({
+          payloads: [{ text: "ok" }],
+          meta: { durationMs: 100 },
+        });
+        const context = makeContext();
+        const baseClient = requireValue(backendGatewayClient(), "expected backend client");
+
+        await invokeAgent(
+          {
+            message: "background plugin subagent task on stale main session",
+            sessionKey,
+            idempotencyKey: runId,
+          },
+          {
+            context,
+            reqId: runId,
+            client: {
+              connect: baseClient.connect,
+              internal: {
+                ...baseClient.internal,
+                agentRunTracking: "plugin_subagent",
+                pluginRuntimeOwnerId: "memory-core",
+              },
+            },
+          },
+        );
+
+        await waitForAssertion(() => {
+          const task = requireValue(findTaskByRunId(runId), "expected fallback cli task");
+          expectRecordFields(task, {
+            runtime: "cli",
+            childSessionKey: sessionKey,
+            status: "succeeded",
+            terminalSummary: "completed",
+          });
+        });
+        expect(getSubagentRunByChildSessionKey(sessionKey)).toBeNull();
+      },
+    );
+  });
+
   it("keeps plugin SDK subagent runs best-effort when registry persistence fails", async () => {
     await withTempDir(
       { prefix: "openclaw-gateway-plugin-subagent-registry-fail-" },
