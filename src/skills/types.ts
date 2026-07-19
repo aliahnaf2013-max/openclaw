@@ -113,6 +113,8 @@ export type SkillEligibilityContext = {
 export const WORKSPACE_SKILLS_PROMPT_FORMAT_VERSION = 1;
 
 export type SkillSnapshot = {
+  /** Whether this snapshot excludes all non-workspace skill roots. */
+  workspaceOnly?: boolean;
   prompt: string;
   skills: Array<{ name: string; primaryEnv?: string; requiredEnv?: string[] }>;
   /** Normalized agent-level filter used to build this snapshot; undefined means unrestricted. */

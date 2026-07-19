@@ -1125,7 +1125,10 @@ export async function runEmbeddedAttempt(
       agentId: sessionAgentId,
       eligibility: skillsEligibility,
       skillsSnapshot: skillsSnapshotForRun,
-      workspaceOnly: loadSkillsWorkspaceOnly,
+      workspaceOnly:
+        params.skillsWorkspaceOnly === true ||
+        skillsSnapshotForRun?.workspaceOnly === true ||
+        loadSkillsWorkspaceOnly,
     });
     restoreSkillEnv = skillsSnapshotForRun
       ? applySkillEnvOverridesFromSnapshot({

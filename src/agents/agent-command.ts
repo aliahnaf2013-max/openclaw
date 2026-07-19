@@ -1354,6 +1354,7 @@ async function agentCommandInternal(
           }),
         },
         watch: false,
+        workspaceOnly: opts.skillsWorkspaceOnly === true,
       });
       const needsSkillsSnapshot =
         isNewSession || !currentSkillsSnapshot || skillSnapshotState.shouldRefresh;

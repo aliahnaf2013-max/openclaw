@@ -25,6 +25,7 @@ export type ReusableSkillSnapshotParams = {
   snapshotVersion?: number;
   watch?: boolean;
   hydrateExisting?: boolean;
+  workspaceOnly?: boolean;
 };
 
 export type ReusableSkillSnapshotResult = {
@@ -68,9 +69,12 @@ export function resolveReusableWorkspaceSkillSnapshot(
     params.existingSnapshot?.version,
     snapshotVersion,
   );
+  const workspaceOnlyChanged =
+    (params.existingSnapshot?.workspaceOnly === true) !== (params.workspaceOnly === true);
   const shouldRefresh =
     promptFormatChanged ||
     skillVersionChanged ||
+    workspaceOnlyChanged ||
     !matchesSkillFilter(params.existingSnapshot?.skillFilter, params.skillFilter);
   const buildSnapshot = () => {
     return buildWorkspaceSkillSnapshot(params.workspaceDir, {
@@ -79,6 +83,7 @@ export function resolveReusableWorkspaceSkillSnapshot(
       skillFilter: params.skillFilter,
       eligibility: params.eligibility,
       snapshotVersion,
+      workspaceOnly: params.workspaceOnly === true,
     });
   };
 
@@ -90,6 +95,7 @@ export function resolveReusableWorkspaceSkillSnapshot(
     params.agentId,
     params.eligibility,
     configFingerprint,
+    params.workspaceOnly === true,
   ]);
 
   const cachedRebuild = (): SkillSnapshot => {

@@ -122,6 +122,28 @@ describe("ensureSkillSnapshot", () => {
     expect(resolveAgentIdFromSessionKeyMock).not.toHaveBeenCalled();
   });
 
+  it("keeps isolated child skill discovery workspace-only", async () => {
+    vi.stubEnv("OPENCLAW_TEST_FAST", "0");
+    const sessionEntry: SessionEntry = {
+      sessionId: "isolated-child",
+      updatedAt: 1,
+      spawnedSkillsWorkspaceOnly: true,
+    };
+
+    await ensureSkillSnapshot({
+      sessionEntry,
+      sessionKey: "agent:main:subagent:isolated",
+      isFirstTurnInSession: false,
+      workspaceDir: TEST_WORKSPACE_DIR,
+      cfg: {},
+    });
+
+    expect(buildWorkspaceSkillSnapshotMock).toHaveBeenCalledWith(
+      TEST_WORKSPACE_DIR,
+      expect.objectContaining({ workspaceOnly: true }),
+    );
+  });
+
   it("keeps a concurrent rename and unpin while persisting a skill snapshot", async () => {
     vi.stubEnv("OPENCLAW_TEST_FAST", "0");
     const root = tempDirs.make("openclaw-session-updates-");

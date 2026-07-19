@@ -3372,6 +3372,7 @@ export const agentHandlers: GatewayRequestHandlers = {
                 spawnedBy: spawnedByValue,
                 workspaceDir: sessionEntry?.spawnedWorkspaceDir,
               }),
+              skillsWorkspaceOnly: sessionEntry?.spawnedSkillsWorkspaceOnly === true,
               cwd: resolveSessionRuntimeCwd({
                 requestedCwd: request.cwd,
                 sessionEntry,
