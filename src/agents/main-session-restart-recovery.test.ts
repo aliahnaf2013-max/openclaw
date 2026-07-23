@@ -128,6 +128,16 @@ describe("main-session-restart-recovery", () => {
         updatedAt: Date.now() - 10_000,
         status: "running",
       },
+      "agent:main:openai:dispatch": {
+        sessionId: "openai-session",
+        updatedAt: Date.now() - 10_000,
+        status: "running",
+      },
+      "agent:main:openresponses:dispatch": {
+        sessionId: "openresponses-session",
+        updatedAt: Date.now() - 10_000,
+        status: "running",
+      },
     });
 
     registerAgentRunContext("restart-run", {
@@ -143,14 +153,22 @@ describe("main-session-restart-recovery", () => {
     });
     const result = await markRestartAbortedMainSessions({
       stateDir: tmpDir,
-      sessionKeys: ["agent:main:main", "agent:main:completed", "agent:main:subagent:child"],
+      sessionKeys: [
+        "agent:main:main",
+        "agent:main:completed",
+        "agent:main:subagent:child",
+        "agent:main:openai:dispatch",
+        "agent:main:openresponses:dispatch",
+      ],
     });
 
     const store = loadSessionStore(path.join(sessionsDir, "sessions.json"));
-    expect(result).toEqual({ marked: 1, skipped: 1 });
+    expect(result).toEqual({ marked: 1, skipped: 3 });
     expect(store["agent:main:main"]?.abortedLastRun).toBe(true);
     expect(store["agent:main:completed"]?.abortedLastRun).toBeUndefined();
     expect(store["agent:main:subagent:child"]?.abortedLastRun).toBeUndefined();
+    expect(store["agent:main:openai:dispatch"]?.abortedLastRun).toBeUndefined();
+    expect(store["agent:main:openresponses:dispatch"]?.abortedLastRun).toBeUndefined();
     expect(store["cron:nightly"]?.abortedLastRun).toBeUndefined();
     expect(store["agent:main:other"]?.abortedLastRun).toBeUndefined();
     const lifecycleGeneration = getAgentEventLifecycleGeneration();

@@ -63,6 +63,9 @@ function shouldSkipMainRecovery(entry: SessionEntry, sessionKey: string): boolea
   if (entry.subagentRole != null) {
     return true;
   }
+  if (sessionKey.includes(":openai:") || sessionKey.includes(":openresponses:")) {
+    return true;
+  }
   return (
     isSubagentSessionKey(sessionKey) || isCronSessionKey(sessionKey) || isAcpSessionKey(sessionKey)
   );

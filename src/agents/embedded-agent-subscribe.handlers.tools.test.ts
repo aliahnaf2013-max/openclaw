@@ -867,6 +867,15 @@ describe("handleToolExecutionEnd sessions_spawn terminal success tracking", () =
   it("records accepted sessions_spawn identifiers", async () => {
     const { ctx } = createTestContext();
 
+    await handleToolExecutionStart(
+      ctx as never,
+      {
+        type: "tool_execution_start",
+        toolName: "sessions_spawn",
+        toolCallId: "tool-spawn-accepted",
+        args: { task: "spawn a child" },
+      } as never,
+    );
     await handleToolExecutionEnd(
       ctx as never,
       {
@@ -888,6 +897,8 @@ describe("handleToolExecutionEnd sessions_spawn terminal success tracking", () =
       {
         runId: "run-child",
         childSessionKey: "agent:claude:subagent:child",
+        parentRunId: "run-test",
+        parentSessionKey: "agent:unit-session",
       },
     ]);
     expect(ctx.state.replayState).toEqual({
@@ -933,6 +944,33 @@ describe("handleToolExecutionEnd sessions_spawn terminal success tracking", () =
     );
 
     expect(ctx.state.acceptedSessionSpawns).toEqual([]);
+  });
+
+  it("does not credit accepted sessions_spawn results without a current-run start", async () => {
+    const { ctx } = createTestContext();
+
+    await handleToolExecutionEnd(
+      ctx as never,
+      {
+        type: "tool_execution_end",
+        toolName: "sessions_spawn",
+        toolCallId: "tool-spawn-stale",
+        isError: false,
+        result: {
+          details: {
+            status: "accepted",
+            runId: "run-stale-child",
+            childSessionKey: "agent:claude:subagent:stale",
+          },
+        },
+      } as never,
+    );
+
+    expect(ctx.state.acceptedSessionSpawns).toEqual([]);
+    expect(ctx.state.replayState).toEqual({
+      replayInvalid: false,
+      hadPotentialSideEffects: false,
+    });
   });
 });
 

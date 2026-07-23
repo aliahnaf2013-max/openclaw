@@ -6,6 +6,13 @@ import type { SkillSnapshot } from "../types.js";
 
 const TEST_WORKSPACE_DIR = "/tmp/workspace";
 
+type MockSkillSnapshot = {
+  prompt: string;
+  skills: unknown[];
+  resolvedSkills: unknown[];
+  workspaceOnly?: boolean;
+};
+
 function strippedSnapshot(skillName = "test", version = 1): SkillSnapshot {
   return {
     prompt: "skills prompt",
@@ -21,11 +28,13 @@ const {
   getSkillsSnapshotVersionMock,
   shouldRefreshSnapshotForVersionMock,
 } = vi.hoisted(() => ({
-  buildWorkspaceSkillSnapshotMock: vi.fn((..._args: unknown[]) => ({
-    prompt: "",
-    skills: [] as unknown[],
-    resolvedSkills: [] as unknown[],
-  })),
+  buildWorkspaceSkillSnapshotMock: vi.fn(
+    (..._args: unknown[]): MockSkillSnapshot => ({
+      prompt: "",
+      skills: [] as unknown[],
+      resolvedSkills: [] as unknown[],
+    }),
+  ),
   ensureSkillsWatcherMock: vi.fn(),
   getSkillsSnapshotVersionMock: vi.fn(() => 1),
   shouldRefreshSnapshotForVersionMock: vi.fn((cached = 0, next = 0) =>

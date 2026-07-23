@@ -111,6 +111,7 @@ import type { PluginHookSessionEndReason } from "../../plugins/hook-types.js";
 import {
   classifySessionKeyShape,
   isAcpSessionKey,
+  isSubagentSessionKey,
   normalizeAgentId,
   parseAgentSessionKey,
 } from "../../routing/session-key.js";
@@ -667,7 +668,10 @@ function resolveGatewayAgentTaskTrackingMode(params: {
   if (!params.sessionKey?.trim() || params.inputProvenance?.kind === "inter_session") {
     return "none";
   }
-  if (params.client?.internal?.agentRunTracking === "plugin_subagent") {
+  if (
+    params.client?.internal?.agentRunTracking === "plugin_subagent" &&
+    (isSubagentSessionKey(params.sessionKey) || params.confirmedAcpManualSpawn === true)
+  ) {
     return "plugin_subagent";
   }
   // A confirmed ACP manual-spawn child turn already owns its requester-visible
