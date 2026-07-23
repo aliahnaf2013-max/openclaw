@@ -67,10 +67,6 @@ function resolveChildInvocation(params: {
 
 export type ChildAdapter = SpawnProcessAdapter<NodeJS.Signals | null>;
 
-function isServiceManagedRuntime(): boolean {
-  return Boolean(process.env.OPENCLAW_SERVICE_MARKER?.trim());
-}
-
 export async function createChildAdapter(params: {
   argv: string[];
   cwd?: string;
