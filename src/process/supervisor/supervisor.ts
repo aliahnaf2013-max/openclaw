@@ -91,17 +91,20 @@ function resolveElapsedTimeoutReason(params: {
 
 const globalActiveRunsSymbol = Symbol.for("openclaw.supervisor.activeRunsGlobal");
 const exitListenerSymbol = Symbol.for("openclaw.supervisor.exitListenerRegistered");
+const supervisorGlobals = globalThis as typeof globalThis & {
+  [globalActiveRunsSymbol]?: Map<string, ManagedRun>;
+  [exitListenerSymbol]?: boolean;
+};
 
 const activeRunsGlobal = (() => {
-  const g = globalThis as any;
-  if (!g[globalActiveRunsSymbol]) {
-    g[globalActiveRunsSymbol] = new Map<string, ManagedRun>();
+  if (!supervisorGlobals[globalActiveRunsSymbol]) {
+    supervisorGlobals[globalActiveRunsSymbol] = new Map<string, ManagedRun>();
   }
-  return g[globalActiveRunsSymbol] as Map<string, ManagedRun>;
+  return supervisorGlobals[globalActiveRunsSymbol];
 })();
 
-if (!(globalThis as any)[exitListenerSymbol]) {
-  (globalThis as any)[exitListenerSymbol] = true;
+if (!supervisorGlobals[exitListenerSymbol]) {
+  supervisorGlobals[exitListenerSymbol] = true;
   process.on("exit", () => {
     for (const run of activeRunsGlobal.values()) {
       try {

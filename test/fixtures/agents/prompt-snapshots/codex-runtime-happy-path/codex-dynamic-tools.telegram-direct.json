@@ -214,6 +214,10 @@
         },
         "thinking": {
           "type": "string"
+        },
+        "workspace": {
+          "description": "Native child workspace; must be an existing descendant of the target agent workspace.",
+          "type": "string"
         }
       },
       "required": ["task"],
