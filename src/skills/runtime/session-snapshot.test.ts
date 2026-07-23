@@ -79,6 +79,44 @@ describe("resolveReusableWorkspaceSkillSnapshot", () => {
     expect(buildWorkspaceSkillSnapshotMock).toHaveBeenCalledTimes(1);
   });
 
+  it("rebuilds and tags a snapshot when workspace-only discovery is enabled", () => {
+    shouldRefreshSnapshotForVersionMock.mockReturnValue(false);
+    buildWorkspaceSkillSnapshotMock.mockReturnValue({
+      prompt: "assigned only",
+      skills: [{ name: "assigned" }],
+      resolvedSkills: [],
+      workspaceOnly: true,
+    });
+
+    const result = resolveReusableWorkspaceSkillSnapshot({
+      workspaceDir: TEST_WORKSPACE_DIR,
+      config: {},
+      existingSnapshot: strippedSnapshot(),
+      workspaceOnly: true,
+    });
+
+    expect(result.shouldRefresh).toBe(true);
+    expect(buildWorkspaceSkillSnapshotMock).toHaveBeenCalledWith(
+      TEST_WORKSPACE_DIR,
+      expect.objectContaining({ workspaceOnly: true }),
+    );
+    expect(result.snapshot.workspaceOnly).toBe(true);
+  });
+
+  it("keeps ordinary child snapshots reusable without workspace-only policy", () => {
+    shouldRefreshSnapshotForVersionMock.mockReturnValue(false);
+    const existingSnapshot = strippedSnapshot();
+
+    const result = resolveReusableWorkspaceSkillSnapshot({
+      workspaceDir: TEST_WORKSPACE_DIR,
+      config: {},
+      existingSnapshot,
+    });
+
+    expect(result.shouldRefresh).toBe(false);
+    expect(result.snapshot.workspaceOnly).toBeUndefined();
+  });
+
   it("invalidates cached resolvedSkills when skillFilter changes", () => {
     const snapshot = strippedSnapshot();
 

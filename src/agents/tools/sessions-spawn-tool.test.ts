@@ -317,6 +317,7 @@ describe("sessions_spawn tool", () => {
       model: "anthropic/claude-sonnet-4-6",
       thinking: "medium",
       cwd: "/workspace/requester",
+      workspace: "/workspace/requester/.fleet-runs/run-1",
       thread: true,
       mode: "session",
       cleanup: "keep",
@@ -334,12 +335,27 @@ describe("sessions_spawn tool", () => {
     expect(spawnArgs.model).toBe("anthropic/claude-sonnet-4-6");
     expect(spawnArgs.thinking).toBe("medium");
     expect(spawnArgs.cwd).toBe("/workspace/requester");
+    expect(spawnArgs.workspace).toBe("/workspace/requester/.fleet-runs/run-1");
     expect(spawnArgs).not.toHaveProperty("runTimeoutSeconds");
     expect(spawnArgs.thread).toBe(true);
     expect(spawnArgs.mode).toBe("session");
     expect(spawnArgs.cleanup).toBe("keep");
     const spawnContext = mockCallArg(hoisted.spawnSubagentDirectMock, 0, 1, "spawnSubagentDirect");
     expect(spawnContext.agentSessionKey).toBe("agent:main:main");
+    expect(hoisted.spawnAcpDirectMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects native workspace overrides for ACP spawns", async () => {
+    registerAcpBackendForTest();
+    const tool = createSessionsSpawnTool();
+
+    await expect(
+      tool.execute("call-acp-workspace", {
+        runtime: "acp",
+        task: "investigate",
+        workspace: "/workspace/isolated",
+      }),
+    ).rejects.toThrow('workspace is only supported for runtime="subagent".');
     expect(hoisted.spawnAcpDirectMock).not.toHaveBeenCalled();
   });
 

@@ -440,6 +440,7 @@ async function initSessionStateAttemptLocked(
   let persistedLabel: string | undefined;
   let persistedSpawnedBy: SessionEntry["spawnedBy"];
   let persistedSpawnedWorkspaceDir: SessionEntry["spawnedWorkspaceDir"];
+  let persistedSpawnedSkillsWorkspaceOnly: SessionEntry["spawnedSkillsWorkspaceOnly"];
   let persistedSpawnedCwd: SessionEntry["spawnedCwd"];
   let persistedParentSessionKey: SessionEntry["parentSessionKey"];
   let persistedForkedFromParent: SessionEntry["forkedFromParent"];
@@ -758,6 +759,7 @@ async function initSessionStateAttemptLocked(
       // Keep the model/auth choice, but force the next turn to mint a fresh CLI binding.
       persistedSpawnedBy = entry.spawnedBy;
       persistedSpawnedWorkspaceDir = entry.spawnedWorkspaceDir;
+      persistedSpawnedSkillsWorkspaceOnly = entry.spawnedSkillsWorkspaceOnly;
       persistedSpawnedCwd = entry.spawnedCwd;
       persistedParentSessionKey = entry.parentSessionKey;
       persistedForkedFromParent = entry.forkedFromParent;
@@ -882,6 +884,8 @@ async function initSessionStateAttemptLocked(
     label: persistedLabel ?? baseEntry?.label,
     spawnedBy: persistedSpawnedBy ?? baseEntry?.spawnedBy,
     spawnedWorkspaceDir: persistedSpawnedWorkspaceDir ?? baseEntry?.spawnedWorkspaceDir,
+    spawnedSkillsWorkspaceOnly:
+      persistedSpawnedSkillsWorkspaceOnly ?? baseEntry?.spawnedSkillsWorkspaceOnly,
     spawnedCwd: persistedSpawnedCwd ?? baseEntry?.spawnedCwd,
     parentSessionKey: persistedParentSessionKey ?? baseEntry?.parentSessionKey,
     forkedFromParent: persistedForkedFromParent ?? baseEntry?.forkedFromParent,

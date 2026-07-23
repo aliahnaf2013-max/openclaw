@@ -181,6 +181,7 @@ export async function ensureSkillSnapshot(params: {
       skillFilter,
       eligibility: { remote: remoteEligibility },
       existingSnapshot: snapshot,
+      workspaceOnly: nextEntry?.spawnedSkillsWorkspaceOnly === true,
     });
   const initialSnapshotState = resolveSnapshot(existingSnapshot);
   const shouldRefreshSnapshot = initialSnapshotState.shouldRefresh;

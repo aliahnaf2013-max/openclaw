@@ -3663,6 +3663,7 @@ describe("initSessionState preserves behavior overrides across /new and /reset",
     const overrides = {
       spawnedBy: "agent:main:main",
       spawnedWorkspaceDir: "/tmp/child-workspace",
+      spawnedSkillsWorkspaceOnly: true,
       parentSessionKey: "agent:main:main",
       forkedFromParent: true,
       spawnDepth: 2,

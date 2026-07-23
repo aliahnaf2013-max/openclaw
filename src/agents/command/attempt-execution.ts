@@ -830,6 +830,7 @@ export function runAgentAttempt(params: {
     agentHarnessId: embeddedAgentHarnessOverride,
     agentHarnessRuntimeOverride: embeddedAgentHarnessOverride,
     skillsSnapshot: params.skillsSnapshot,
+    skillsWorkspaceOnly: params.opts.skillsWorkspaceOnly,
     prompt: effectivePrompt,
     transcriptPrompt: params.transcriptBody,
     // CLI-origin retries cannot rely on transcript replay: orphan-user repair

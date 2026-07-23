@@ -1437,6 +1437,7 @@ export function buildWorkspaceSkillSnapshot(
     resolvedSkills,
     version: opts?.snapshotVersion,
     promptFormatVersion: WORKSPACE_SKILLS_PROMPT_FORMAT_VERSION,
+    workspaceOnly: opts?.workspaceOnly === true,
   };
 }
 
@@ -1460,6 +1461,8 @@ type WorkspaceSkillBuildOptions = {
   /** If provided, only include skills with these names */
   skillFilter?: string[];
   eligibility?: SkillEligibilityContext;
+  /** Restrict discovery to the workspace-owned skills directory. */
+  workspaceOnly?: boolean;
 };
 
 function resolveEffectiveWorkspaceSkillFilter(

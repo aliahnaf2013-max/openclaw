@@ -5,6 +5,7 @@
  */
 import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
+import path from "node:path";
 import { finiteSecondsToTimerSafeMilliseconds } from "@openclaw/normalization-core/number-coercion";
 import {
   normalizeOptionalLowercaseString,
@@ -34,6 +35,7 @@ import { stringifyRouteThreadId } from "../plugin-sdk/channel-route.js";
 import { listRegisteredPluginAgentPromptGuidance } from "../plugins/command-registry-state.js";
 import type { SubagentLifecycleHookRunner } from "../plugins/hooks.js";
 import { isValidAgentId, normalizeAgentId, parseAgentSessionKey } from "../routing/session-key.js";
+import { isPathInside } from "../security/scan-paths.js";
 import { resolveUserPath } from "../utils.js";
 import type { DeliveryContext } from "../utils/delivery-context.types.js";
 import { listAgentIds, resolveAgentDir } from "./agent-scope-config.js";
@@ -165,6 +167,8 @@ type SpawnSubagentParams = {
   taskName?: string;
   thinking?: string;
   cwd?: string;
+  /** Native child workspace, restricted to a real descendant of the target agent workspace. */
+  workspace?: string;
   runTimeoutSeconds?: number;
   thread?: boolean;
   mode?: SpawnSubagentMode;
@@ -326,6 +330,9 @@ function buildDirectChildSessionPatch(patch: Record<string, unknown>): Partial<S
   }
   if (typeof patch.spawnedWorkspaceDir === "string" && patch.spawnedWorkspaceDir.trim()) {
     entry.spawnedWorkspaceDir = patch.spawnedWorkspaceDir.trim();
+  }
+  if (patch.spawnedSkillsWorkspaceOnly === true) {
+    entry.spawnedSkillsWorkspaceOnly = true;
   }
   if (typeof patch.spawnedCwd === "string" && patch.spawnedCwd.trim()) {
     entry.spawnedCwd = patch.spawnedCwd.trim();
@@ -1192,7 +1199,7 @@ export async function spawnSubagentDirect(
   }
   const targetAgentId = requestedAgentId ? normalizeAgentId(requestedAgentId) : requesterAgentId;
   const requestedCwd = normalizeOptionalString(params.cwd);
-  const spawnedCwd = requestedCwd ? resolveUserPath(requestedCwd) : undefined;
+  let spawnedCwd = requestedCwd ? resolveUserPath(requestedCwd) : undefined;
   const toolSpawnMetadata = mapToolContextToSpawnedRunMetadata({
     agentGroupId: ctx.agentGroupId,
     agentGroupChannel: ctx.agentGroupChannel,
@@ -1206,6 +1213,47 @@ export async function spawnSubagentDirect(
     targetAgentId,
     explicitWorkspaceDir: inheritedWorkspaceDir,
   });
+  let effectiveWorkspaceDir = spawnedWorkspaceDir;
+  const requestedWorkspace = normalizeOptionalString(params.workspace);
+  if (requestedWorkspace) {
+    if (!spawnedWorkspaceDir) {
+      return {
+        status: "forbidden",
+        error: "workspace override requires a target agent workspace",
+      };
+    }
+    try {
+      const rootResolvedPath = path.resolve(resolveUserPath(spawnedWorkspaceDir));
+      const requestedResolvedPath = path.resolve(resolveUserPath(requestedWorkspace));
+      const relativeWorkspacePath = path.relative(rootResolvedPath, requestedResolvedPath);
+      const [rootRealPath, requestedRealPath] = await Promise.all([
+        fs.realpath(rootResolvedPath),
+        fs.realpath(requestedResolvedPath),
+      ]);
+      const requestedStat = await fs.stat(requestedRealPath);
+      if (
+        !requestedStat.isDirectory() ||
+        relativeWorkspacePath === "" ||
+        relativeWorkspacePath.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativeWorkspacePath) ||
+        requestedRealPath !== path.resolve(rootRealPath, relativeWorkspacePath) ||
+        requestedRealPath === rootRealPath ||
+        !isPathInside(rootRealPath, requestedRealPath)
+      ) {
+        return {
+          status: "forbidden",
+          error:
+            "workspace override must be a symlink-free descendant of the target agent workspace",
+        };
+      }
+      effectiveWorkspaceDir = requestedRealPath;
+    } catch {
+      return {
+        status: "forbidden",
+        error: "workspace override must resolve to an existing directory",
+      };
+    }
+  }
   const requesterOrigin = normalizeDeliveryContext({
     channel: ctx.agentChannel,
     accountId: ctx.agentAccountId,
@@ -1263,9 +1311,31 @@ export async function spawnSubagentDirect(
         'sessions_spawn sandbox="require" needs a sandboxed target runtime. Pick a sandboxed agentId or use sandbox="inherit".',
     };
   }
-  const spawnedWorkspaceCwd = spawnedWorkspaceDir
-    ? resolveUserPath(spawnedWorkspaceDir)
+  const spawnedWorkspaceCwd = effectiveWorkspaceDir
+    ? resolveUserPath(effectiveWorkspaceDir)
     : undefined;
+  if (requestedWorkspace && spawnedCwd) {
+    try {
+      spawnedCwd = await fs.realpath(spawnedCwd);
+    } catch {
+      return {
+        status: "forbidden",
+        error: "cwd must resolve inside the requested child workspace",
+      };
+    }
+  }
+  if (
+    requestedWorkspace &&
+    spawnedCwd &&
+    spawnedWorkspaceCwd &&
+    spawnedCwd !== spawnedWorkspaceCwd &&
+    !isPathInside(spawnedWorkspaceCwd, spawnedCwd)
+  ) {
+    return {
+      status: "forbidden",
+      error: "cwd must remain inside the requested child workspace",
+    };
+  }
   if (childRuntime.sandboxed && spawnedCwd && spawnedCwd !== spawnedWorkspaceCwd) {
     return {
       status: "forbidden",
@@ -1458,7 +1528,7 @@ export async function spawnSubagentDirect(
   const materializedAttachments = await materializeSubagentAttachments({
     config: cfg,
     targetAgentId,
-    workspaceDir: spawnedCwd ?? spawnedWorkspaceDir,
+    workspaceDir: spawnedCwd ?? effectiveWorkspaceDir,
     attachments: params.attachments,
     mountPathHint,
   });
@@ -1494,11 +1564,12 @@ export async function spawnSubagentDirect(
   const spawnedMetadata = normalizeSpawnedRunMetadata({
     spawnedBy: spawnedByKey,
     ...toolSpawnMetadata,
-    workspaceDir: spawnedWorkspaceDir,
+    workspaceDir: effectiveWorkspaceDir,
   });
   const spawnLineagePatchError = await patchChildSession({
     spawnedBy: spawnedByKey,
     ...(spawnedMetadata.workspaceDir ? { spawnedWorkspaceDir: spawnedMetadata.workspaceDir } : {}),
+    ...(requestedWorkspace ? { spawnedSkillsWorkspaceOnly: true } : {}),
     ...(spawnedCwd ? { spawnedCwd } : {}),
   });
   if (spawnLineagePatchError) {
