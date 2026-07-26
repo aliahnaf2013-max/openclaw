@@ -5,7 +5,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
-
+// Invoked explicitly by the trusted policy workflow; intentionally not named
+// *.test.mjs so OpenClaw's Vitest shard discovery does not claim this Node test.
 import {
   CANONICAL_STABLE_RELEASE_BRANCH,
   verifyStableReleaseCandidate,
@@ -37,7 +38,10 @@ function fixture() {
   writeFileSync(join(root, "feature.txt"), "structured yield\n");
   git(root, "add", ".");
   git(root, "commit", "-m", "feature");
-  const digest = (path) => createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+  const digest = (path) =>
+    createHash("sha256")
+      .update(readFileSync(join(root, path)))
+      .digest("hex");
   const options = {
     repo: root,
     baseBranch: CANONICAL_STABLE_RELEASE_BRANCH,
@@ -77,7 +81,10 @@ void describe("stable release candidate policy", () => {
   void it("rejects an altered trusted gate definition", () => {
     const { root, options } = fixture();
     writeFileSync(join(root, "gate.yml"), "weakened gate\n");
-    assert.throws(() => verifyStableReleaseCandidate(options), /trusted_gate_definition_changed:gate.yml/);
+    assert.throws(
+      () => verifyStableReleaseCandidate(options),
+      /trusted_gate_definition_changed:gate.yml/,
+    );
   });
 
   void it("rejects the wrong merge target branch", () => {
