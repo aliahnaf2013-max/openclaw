@@ -1,0 +1,72 @@
+name: Stable Release Policy
+
+on:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] executes only the trusted protected-base policy; candidate files are read but never executed
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [pulse-v2026.7.1-base]
+  push:
+    branches: [pulse-v2026.7.1-base]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stable-release-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stable-release-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      APPROVED_STABLE_SHA: 2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4
+      CANONICAL_BASE_BRANCH: pulse-v2026.7.1-base
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    steps:
+      - name: Checkout trusted policy only
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          fetch-depth: 1
+          fetch-tags: false
+          persist-credentials: false
+          submodules: false
+
+      - name: Prove trusted policy positive and negative fixtures
+        run: node --test scripts/verify-stable-release-candidate.test.mjs
+
+      - name: Fetch candidate with complete ancestry without executing it
+        env:
+          CANDIDATE_SHA: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
+          PR_BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ "${PR_BASE_BRANCH:-$CANONICAL_BASE_BRANCH}" != "$CANONICAL_BASE_BRANCH" ]]; then
+            echo "wrong stable release target" >&2
+            exit 1
+          fi
+          candidate_dir="$RUNNER_TEMP/stable-candidate"
+          protected_base_sha="${PR_BASE_SHA:-$PUSH_BEFORE_SHA}"
+          git init "$candidate_dir"
+          git -C "$candidate_dir" remote add origin "https://github.com/${REPOSITORY}.git"
+          git -C "$candidate_dir" fetch --no-tags --filter=blob:none origin \
+            "$CANDIDATE_SHA" "$protected_base_sha" "$APPROVED_STABLE_SHA"
+          git -C "$candidate_dir" checkout --detach "$CANDIDATE_SHA"
+
+          workflow_sha="$(sha256sum .github/workflows/stable-release-gate.yml | cut -d' ' -f1)"
+          tests_workflow_sha="$(sha256sum .github/workflows/stable-release-tests.yml | cut -d' ' -f1)"
+          policy_sha="$(sha256sum scripts/verify-stable-release-candidate.mjs | cut -d' ' -f1)"
+          test_sha="$(sha256sum scripts/verify-stable-release-candidate.test.mjs | cut -d' ' -f1)"
+
+          node scripts/verify-stable-release-candidate.mjs \
+            --repo "$candidate_dir" \
+            --base-branch "${PR_BASE_BRANCH:-$CANONICAL_BASE_BRANCH}" \
+            --approved-stable-sha "$APPROVED_STABLE_SHA" \
+            --protected-base-sha "$protected_base_sha" \
+            --trusted-file ".github/workflows/stable-release-gate.yml=$workflow_sha" \
+            --trusted-file ".github/workflows/stable-release-tests.yml=$tests_workflow_sha" \
+            --trusted-file "scripts/verify-stable-release-candidate.mjs=$policy_sha" \
+            --trusted-file "scripts/verify-stable-release-candidate.test.mjs=$test_sha"
