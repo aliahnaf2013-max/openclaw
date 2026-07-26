@@ -11,6 +11,7 @@ import {
 import { isClientToolNameConflictError } from "../agents/agent-tool-definition-adapter.js";
 import type { AgentStreamParams, ClientToolDefinition } from "../agents/command/shared-types.js";
 import type { ImageContent } from "../agents/command/types.js";
+import { createOpenClawYieldedInterimStatus } from "../agents/interim-status.js";
 import { STREAM_ERROR_FALLBACK_TEXT } from "../agents/stream-message-shared.js";
 import {
   hasNonzeroUsage,
@@ -817,6 +818,16 @@ function resolveChatCompletionUsage(result: unknown): OpenAiChatCompletionsUsage
   return toOpenAiChatCompletionsUsage(resolveAgentRunUsage(result));
 }
 
+function resolveOpenClawInterimStatus(result: unknown, runId: string) {
+  const yielded =
+    (
+      result as {
+        meta?: { yielded?: unknown };
+      } | null
+    )?.meta?.yielded === true;
+  return yielded ? createOpenClawYieldedInterimStatus(runId) : undefined;
+}
+
 function resolveIncludeUsageForStreaming(payload: OpenAiChatCompletionRequest): boolean {
   // Keep parsing aligned with OpenAI wire-format field names.
   // Flow reference: src/agents/openai-transport-stream.ts:1262-1273
@@ -1138,12 +1149,14 @@ export async function handleOpenAiHttpRequest(
         return true;
       }
       const content = resolveAgentResponseText(result);
+      const interimStatus = resolveOpenClawInterimStatus(result, runId);
 
       sendJson(res, 200, {
         id: runId,
         object: "chat.completion",
         created: Math.floor(Date.now() / 1000),
         model,
+        ...(interimStatus ? { openclaw: interimStatus } : {}),
         choices: [
           {
             index: 0,

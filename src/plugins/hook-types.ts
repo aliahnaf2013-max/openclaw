@@ -1,3 +1,4 @@
+import type { OpenClawInterimStatus } from "../agents/interim-status.js";
 import type { AgentMessage } from "../agents/runtime/index.js";
 import type { SourceReplyDeliveryMode } from "../auto-reply/get-reply-options.types.js";
 import type { ReplyPayload } from "../auto-reply/reply-payload.js";
@@ -404,6 +405,8 @@ export type PluginHookAgentEndEvent = {
   success: boolean;
   error?: string;
   durationMs?: number;
+  /** Runtime-generated per-run liveness marker; never inferred from assistant text. */
+  openclaw?: OpenClawInterimStatus;
 };
 
 export type PluginHookBeforeAgentFinalizeEvent = {
