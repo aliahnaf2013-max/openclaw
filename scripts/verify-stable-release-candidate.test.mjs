@@ -13,7 +13,9 @@ import {
 
 const roots = [];
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const root of roots.splice(0)) {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 function git(repo, ...args) {
@@ -49,12 +51,12 @@ function fixture() {
   return { root, stableSha, options };
 }
 
-describe("stable release candidate policy", () => {
-  it("accepts an exact-version descendant of the protected stable base", () => {
+void describe("stable release candidate policy", () => {
+  void it("accepts an exact-version descendant of the protected stable base", () => {
     assert.equal(verifyStableReleaseCandidate(fixture().options).ok, true);
   });
 
-  it("rejects a divergent candidate without approved stable ancestry", () => {
+  void it("rejects a divergent candidate without approved stable ancestry", () => {
     const { root, options } = fixture();
     git(root, "checkout", "--orphan", "divergent");
     git(root, "rm", "-rf", ".");
@@ -66,19 +68,19 @@ describe("stable release candidate policy", () => {
     assert.throws(() => verifyStableReleaseCandidate(options), /approved_stable_ancestry_missing/);
   });
 
-  it("rejects a version regression", () => {
+  void it("rejects a version regression", () => {
     const { root, options } = fixture();
     writeFileSync(join(root, "package.json"), '{"version":"2026.6.10"}\n');
     assert.throws(() => verifyStableReleaseCandidate(options), /version_regression/);
   });
 
-  it("rejects an altered trusted gate definition", () => {
+  void it("rejects an altered trusted gate definition", () => {
     const { root, options } = fixture();
     writeFileSync(join(root, "gate.yml"), "weakened gate\n");
     assert.throws(() => verifyStableReleaseCandidate(options), /trusted_gate_definition_changed:gate.yml/);
   });
 
-  it("rejects the wrong merge target branch", () => {
+  void it("rejects the wrong merge target branch", () => {
     const { options } = fixture();
     assert.throws(
       () => verifyStableReleaseCandidate({ ...options, baseBranch: "main" }),

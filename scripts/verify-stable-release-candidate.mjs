@@ -69,20 +69,28 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (!flag?.startsWith("--") || value == null) throw new Error(`invalid_argument:${flag}`);
+    if (!flag?.startsWith("--") || value == null) {
+      throw new Error(`invalid_argument:${flag}`);
+    }
     index += 1;
     if (flag === "--trusted-file") {
       const separator = value.lastIndexOf("=");
-      if (separator <= 0) throw new Error("trusted_file_argument_invalid");
+      if (separator <= 0) {
+        throw new Error("trusted_file_argument_invalid");
+      }
       const path = value.slice(0, separator);
       const digest = value.slice(separator + 1);
-      if (!/^[0-9a-f]{64}$/.test(digest)) throw new Error("trusted_file_digest_invalid");
+      if (!/^[0-9a-f]{64}$/.test(digest)) {
+        throw new Error("trusted_file_digest_invalid");
+      }
       trustedFiles.push({ path, sha256: digest });
     } else {
       values.set(flag, value);
     }
   }
-  if (trustedFiles.length === 0) throw new Error("trusted_files_required");
+  if (trustedFiles.length === 0) {
+    throw new Error("trusted_files_required");
+  }
   return {
     repo: values.get("--repo") ?? "",
     baseBranch: values.get("--base-branch") ?? "",
