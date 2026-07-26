@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  stable-release-policy:
+  stable-release-gate:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
