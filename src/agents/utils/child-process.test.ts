@@ -18,7 +18,7 @@ describe.skipIf(process.platform === "win32")("waitForChildProcess", () => {
 
   it("drains active descendant output after the parent exits", async () => {
     const command =
-      'printf "HEAD\\n"; ( for i in 1 2 3 4 5 6; do sleep 0.05; printf "TICK$i\\n"; done ) &';
+      'printf "HEAD\\n"; ( for i in 1 2 3 4 5 6; do printf "TICK$i\\n"; sleep 0.05; done ) &';
     child = spawn("/bin/sh", ["-c", command], {
       stdio: ["ignore", "pipe", "pipe"],
       detached: true,

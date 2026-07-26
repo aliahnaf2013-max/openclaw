@@ -67,7 +67,8 @@ describe("LLM API registry", () => {
 
   it("shares default runtime registrations across duplicated module instances", async () => {
     const duplicateRuntime = (await import(
-      ["./internal/default-runtime.js", "duplicate-runtime"].join("?")
+      /* @vite-ignore */ new URL("./internal/default-runtime.ts?duplicate-runtime", import.meta.url)
+        .href
     )) as typeof import("./internal/default-runtime.js");
     const streamSimple = vi.fn(emptyStream);
     duplicateRuntime.registerApiProvider(
