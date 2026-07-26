@@ -5,7 +5,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
-import { readBoundedResponseText as readBoundedResponseTextWithLimit } from "../lib/bounded-response.mjs";
+import { gunzipSync } from "node:zlib";
+import { readBoundedResponseBytes } from "../lib/bounded-response.mjs";
 
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 const BULK_ADVISORY_PATH = "/-/npm/v1/security/advisories/bulk";
@@ -736,15 +737,6 @@ async function withBulkAdvisoryTimeout({ label, timeoutMs, run }) {
   }
 }
 
-async function readBoundedResponseText(response, maxBytes, label, options = {}) {
-  return await readBoundedResponseTextWithLimit(response, label, maxBytes, {
-    signal: options.signal,
-    timeoutPromise: options.timeoutPromise,
-    formatTooLargeMessage: (messageLabel, bytes) => `${messageLabel} exceeded ${bytes} bytes`,
-    createTooLargeError: (message) => Object.assign(new Error(message), { code: "ETOOBIG" }),
-  });
-}
-
 export async function readBoundedBulkAdvisoryErrorText(
   response,
   maxChars = BULK_ADVISORY_ERROR_BODY_MAX_CHARS,
@@ -800,12 +792,36 @@ export async function readBoundedBulkAdvisoryErrorText(
 }
 
 async function readBulkAdvisoryJson(response, maxBytes, options = {}) {
-  const text = await readBoundedResponseText(
+  const rawBody = await readBoundedResponseBytes(
     response,
-    maxBytes,
     "Bulk advisory response body",
-    options,
+    maxBytes,
+    {
+      signal: options.signal,
+      timeoutPromise: options.timeoutPromise,
+      formatTooLargeMessage: (messageLabel, bytes) => `${messageLabel} exceeded ${bytes} bytes`,
+      createTooLargeError: (message) => Object.assign(new Error(message), { code: "ETOOBIG" }),
+    },
   );
+  let decodedBody = rawBody;
+  if (rawBody[0] === 0x1f && rawBody[1] === 0x8b && rawBody[2] === 0x08) {
+    try {
+      decodedBody = gunzipSync(rawBody, { maxOutputLength: maxBytes });
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+      const message = error instanceof Error ? error.message : String(error);
+      if (code === "ERR_BUFFER_TOO_LARGE" || /maxOutputLength|larger than/u.test(message)) {
+        throw Object.assign(
+          new Error(`Bulk advisory decompressed response body exceeded ${maxBytes} bytes`),
+          { code: "ETOOBIG" },
+        );
+      }
+      throw new Error(`Bulk advisory gzip response could not be decoded: ${message}`, {
+        cause: error,
+      });
+    }
+  }
+  const text = new TextDecoder().decode(decodedBody);
   if (!text.trim()) {
     throw new Error("Bulk advisory response body was empty");
   }
@@ -828,6 +844,7 @@ export async function fetchBulkAdvisories({
         method: "POST",
         headers: {
           accept: "application/json",
+          "accept-encoding": "identity",
           "content-type": "application/json",
         },
         body: JSON.stringify(payload),

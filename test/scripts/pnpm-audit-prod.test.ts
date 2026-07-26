@@ -2,6 +2,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
   collectProdResolvedPackagesFromLockfile,
@@ -298,6 +299,47 @@ snapshots:
 
     await expect(request).resolves.toEqual({});
     expect(signal?.aborted).toBe(false);
+  });
+
+  it("requests an identity-encoded advisory response", async () => {
+    let requestHeaders: Headers | undefined;
+    const result = await fetchBulkAdvisories({
+      payload: { axios: ["1.0.0"] },
+      fetchImpl: (async (_url, init) => {
+        requestHeaders = new Headers(init?.headers);
+        return new Response("{}", { status: 200 });
+      }) as typeof fetch,
+    });
+
+    expect(requestHeaders?.get("accept-encoding")).toBe("identity");
+    expect(result).toEqual({});
+  });
+
+  it("decodes a gzip advisory response even when the registry omits the encoding header", async () => {
+    const result = await fetchBulkAdvisories({
+      payload: { axios: ["1.0.0"] },
+      fetchImpl: async () =>
+        new Response(gzipSync(JSON.stringify({ axios: [] })), {
+          status: 200,
+        }),
+    });
+
+    expect(result).toEqual({ axios: [] });
+  });
+
+  it("bounds the decompressed gzip advisory response body", async () => {
+    const compressed = gzipSync(JSON.stringify({ payload: "a".repeat(10_000) }));
+    expect(compressed.byteLength).toBeLessThan(256);
+
+    const request = fetchBulkAdvisories({
+      payload: { axios: ["1.0.0"] },
+      responseBodyMaxBytes: 256,
+      fetchImpl: async () => new Response(compressed, { status: 200 }),
+    });
+
+    await expect(request).rejects.toThrow(
+      /Bulk advisory decompressed response body exceeded 256 bytes/u,
+    );
   });
 
   it("cancels stalled successful bulk advisory response bodies on request timeout", async () => {
