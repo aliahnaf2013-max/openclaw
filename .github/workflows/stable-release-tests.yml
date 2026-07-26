@@ -17,9 +17,14 @@ concurrency:
 jobs:
   stable-release-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+      OPENCLAW_TEST_PROJECTS_PARALLEL: "1"
+      OPENCLAW_VITEST_MAX_WORKERS: "2"
+      OPENCLAW_VITEST_NO_OUTPUT_RETRY: "1"
+      OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS: "300000"
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
