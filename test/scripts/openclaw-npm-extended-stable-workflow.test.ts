@@ -5,7 +5,7 @@ import { parse } from "yaml";
 const workflowPath = ".github/workflows/openclaw-npm-release.yml";
 
 type Step = { env?: Record<string, string>; id?: string; if?: string; name?: string; run?: string };
-type Job = { environment?: string; steps?: Step[] };
+type Job = { environment?: string; "runs-on"?: string; steps?: Step[] };
 type Workflow = {
   on?: {
     workflow_dispatch?: {
@@ -32,6 +32,13 @@ function step(job: Job | undefined, name: string): Step {
 }
 
 describe("minimal npm extended-stable workflow", () => {
+  it("uses the managed release runner upstream and a GitHub-hosted runner in forks", () => {
+    const preflight = workflow().jobs?.preflight_openclaw_npm;
+    expect(preflight?.["runs-on"]).toBe(
+      "${{ github.repository == 'openclaw/openclaw' && 'blacksmith-16vcpu-ubuntu-2404' || 'ubuntu-24.04' }}",
+    );
+  });
+
   it("adds extended-stable without adding policy or verifier contracts", () => {
     const raw = readFileSync(workflowPath, "utf8");
     const parsed = workflow();

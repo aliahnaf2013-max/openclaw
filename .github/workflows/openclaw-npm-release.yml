@@ -66,7 +66,7 @@ jobs:
   preflight_openclaw_npm:
     if: ${{ inputs.preflight_only }}
     # Preflight builds the full release package before publish; ubuntu-latest can OOM in tsdown.
-    runs-on: blacksmith-16vcpu-ubuntu-2404
+    runs-on: ${{ github.repository == 'openclaw/openclaw' && 'blacksmith-16vcpu-ubuntu-2404' || 'ubuntu-24.04' }}
     permissions:
       contents: read
     steps:
