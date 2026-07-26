@@ -360,6 +360,7 @@ import { splitSdkTools } from "../tool-split.js";
 import { mapThinkingLevel, mapThinkingLevelForProvider } from "../utils.js";
 import { flushPendingToolResultsAfterIdle } from "../wait-for-idle-before-flush.js";
 import { abortable as abortableWithSignal } from "./abortable.js";
+import { buildEmbeddedAgentEndEvent } from "./agent-end-event.js";
 import { releaseEmbeddedAttemptSessionLockForAbort } from "./attempt-abort.js";
 import { configureEmbeddedAttemptHttpRuntime } from "./attempt-http-runtime.js";
 import { createEmbeddedAgentSessionWithResourceLoader } from "./attempt-session.js";
@@ -5539,12 +5540,14 @@ export async function runEmbeddedAttempt(
 
         if (!beforeAgentFinalizeRevisionReason) {
           runAgentEndSideEffects({
-            event: {
+            event: buildEmbeddedAgentEndEvent({
+              runId: params.runId,
               messages: messagesSnapshot,
               success: !aborted && !promptError,
               error: promptError ? formatErrorMessage(promptError) : undefined,
               durationMs: Date.now() - promptStartedAt,
-            },
+              yielded: yieldDetected,
+            }),
             ctx: {
               runId: params.runId,
               trace: freezeDiagnosticTraceContext(diagnosticTrace),

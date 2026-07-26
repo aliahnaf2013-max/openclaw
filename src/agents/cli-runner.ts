@@ -57,6 +57,7 @@ import {
   runAgentHarnessLlmInputHook,
   runAgentHarnessLlmOutputHook,
 } from "./harness/lifecycle-hook-helpers.js";
+import { createOpenClawYieldedInterimStatus } from "./interim-status.js";
 import type { AgentMessage } from "./runtime/index.js";
 import { SessionManager } from "./sessions/session-manager.js";
 import { buildAssistantMessage, buildUsageWithNoCost } from "./stream-message-shared.js";
@@ -1116,6 +1117,9 @@ export async function runPreparedCliAgent(
             messages: buildAgentEndMessages(lastAssistant),
             success: true,
             durationMs: Date.now() - context.started,
+            ...(output.yielded === true
+              ? { openclaw: createOpenClawYieldedInterimStatus(params.runId) }
+              : {}),
           },
           ctx: hookContext,
           hookRunner,

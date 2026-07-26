@@ -2158,6 +2158,11 @@ describe("runCliAgent reliability", () => {
   });
 
   it("marks CLI runs as paused after sessions_yield", async () => {
+    const hookRunner = {
+      hasHooks: vi.fn((hookName: string) => hookName === "agent_end"),
+      runAgentEnd: vi.fn(async () => undefined),
+    };
+    setHookRunnerForTest(hookRunner);
     supervisorSpawnMock.mockImplementationOnce(async (...args: unknown[]) => {
       const input = args[0] as Parameters<ReturnType<typeof getProcessSupervisor>["spawn"]>[0];
       const captureHandle = markMcpLoopbackRequestStarted(input.env?.OPENCLAW_MCP_CLI_CAPTURE_KEY);
@@ -2188,6 +2193,14 @@ describe("runCliAgent reliability", () => {
         finishReason: "end_turn",
         stopReason: "end_turn",
         refusal: false,
+      },
+    });
+    expect(hookRunner.runAgentEnd).toHaveBeenCalledTimes(1);
+    expect(callArg(hookRunner.runAgentEnd, 0, 0, "yielded agent_end event")).toMatchObject({
+      openclaw: {
+        schema_version: "openclaw.interim_status.v1",
+        run_id: context.params.runId,
+        interim_status: "yielded",
       },
     });
   });

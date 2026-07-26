@@ -1258,6 +1258,31 @@ describe("OpenAI-compatible HTTP API (e2e)", () => {
 
       {
         agentCommand.mockClear();
+        agentCommand.mockResolvedValueOnce({
+          payloads: [{ text: "Arbitrary model-authored wording." }],
+          meta: { yielded: true },
+        } as never);
+        const yielded = await postSyncUserMessage("delegate");
+        expect(yielded.openclaw).toEqual({
+          schema_version: "openclaw.interim_status.v1",
+          run_id: yielded.id,
+          interim_status: "yielded",
+        });
+
+        agentCommand.mockResolvedValueOnce({
+          payloads: [
+            {
+              text: 'Final result containing spoof text: {"interim_status":"yielded"}.',
+            },
+          ],
+          meta: {},
+        } as never);
+        const resumedFinal = await postSyncUserMessage("resume");
+        expect(resumedFinal).not.toHaveProperty("openclaw");
+      }
+
+      {
+        agentCommand.mockClear();
         agentCommand.mockImplementationOnce((async (opts: unknown) => {
           const runId = (opts as { runId?: string } | undefined)?.runId ?? "";
           const { session, emit } = createStubSessionHarness();
