@@ -24,7 +24,7 @@ on:
         default: ""
         type: string
   push:
-    branches: [main]
+    branches: [main, pulse-v2026.7.1-base]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
@@ -2129,6 +2129,40 @@ jobs:
               exit 1
               ;;
           esac
+
+  stable-release-gate:
+    permissions:
+      contents: read
+    needs: [preflight]
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'pulse-v2026.7.1-base') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/pulse-v2026.7.1-base')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - *linux_node_checkout_step
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+      - name: Verify governed stable release ancestry and version
+        env:
+          APPROVED_STABLE_SHA: 2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = "2026.7.1"
+          git fetch --no-tags --depth=1 origin "$APPROVED_STABLE_SHA"
+          git merge-base --is-ancestor "$APPROVED_STABLE_SHA" HEAD
+      - name: Validate structured interim-status contract
+        run: >-
+          node scripts/run-vitest.mjs
+          src/agents/embedded-agent-runner/run/agent-end-event.test.ts
+          src/gateway/openai-http.test.ts
+          src/agents/cli-runner.reliability.test.ts
+      - name: Run stable release checks
+        run: pnpm check
+      - name: Build stable release package
+        run: pnpm build
 
   ci-timings-summary:
     permissions:
