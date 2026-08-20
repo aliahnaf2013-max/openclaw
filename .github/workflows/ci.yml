@@ -2130,7 +2130,7 @@ jobs:
               ;;
           esac
 
-  stable-release-gate:
+  stable-release-gate-inline:
     permissions:
       contents: read
     needs: [preflight]
@@ -2151,7 +2151,16 @@ jobs:
         run: |
           set -euo pipefail
           test "$(node -p "require('./package.json').version")" = "2026.7.1"
-          git fetch --no-tags --depth=1 origin "$APPROVED_STABLE_SHA"
+          # Single combined fetch keeps the commit graph connected: the shared
+          # checkout step above populated this repo with only a disconnected
+          # depth=1 tip at HEAD, so fetching APPROVED_STABLE_SHA on its own
+          # (also depth=1) produced a second, unrelated shallow tip and
+          # `merge-base --is-ancestor` could never succeed. Re-fetching HEAD's
+          # own SHA together with APPROVED_STABLE_SHA in one call, without a
+          # depth limit, brings in the connected history shared by both tips
+          # (mirrors the combined-fetch pattern in stable-release-gate.yml).
+          candidate_sha="$(git rev-parse HEAD)"
+          git fetch --no-tags --filter=blob:none origin "$candidate_sha" "$APPROVED_STABLE_SHA"
           git merge-base --is-ancestor "$APPROVED_STABLE_SHA" HEAD
       - name: Validate structured interim-status contract
         run: >-
