@@ -24,7 +24,7 @@ on:
         default: ""
         type: string
   push:
-    branches: [main]
+    branches: [main, pulse-v2026.7.1-base]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
@@ -2129,6 +2129,56 @@ jobs:
               exit 1
               ;;
           esac
+
+  stable-release-gate-inline:
+    permissions:
+      contents: read
+    needs: [preflight]
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'pulse-v2026.7.1-base') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/pulse-v2026.7.1-base')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - *linux_node_checkout_step
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+      - name: Verify governed stable release ancestry and version
+        env:
+          APPROVED_STABLE_SHA: 2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = "2026.7.1"
+          # The shared checkout step above leaves this repo shallow-grafted
+          # exactly at the candidate commit (a `--depth=1` fetch with no
+          # parent history). A follow-up fetch of the *same* SHA does not
+          # deepen it - git already has that object and will not re-derive
+          # its parents - so it can never connect to APPROVED_STABLE_SHA,
+          # regardless of true ancestry. Fetch into a fresh throwaway repo
+          # instead, exactly like stable-release-gate.yml's own ancestry
+          # check does, so there is no pre-existing shallow boundary to get
+          # in the way: one combined, depth-unlimited fetch of both the
+          # candidate and the approved SHA brings in their full shared
+          # history in a single connected graph.
+          candidate_sha="$(git rev-parse HEAD)"
+          ancestry_dir="$RUNNER_TEMP/stable-release-ancestry"
+          git init "$ancestry_dir"
+          git -C "$ancestry_dir" remote add origin "https://github.com/${REPOSITORY}.git"
+          git -C "$ancestry_dir" fetch --no-tags --filter=blob:none origin "$candidate_sha" "$APPROVED_STABLE_SHA"
+          git -C "$ancestry_dir" merge-base --is-ancestor "$APPROVED_STABLE_SHA" "$candidate_sha"
+      - name: Validate structured interim-status contract
+        run: >-
+          node scripts/run-vitest.mjs
+          src/agents/embedded-agent-runner/run/agent-end-event.test.ts
+          src/gateway/openai-http.test.ts
+          src/agents/cli-runner.reliability.test.ts
+      - name: Run stable release checks
+        run: pnpm check
+      - name: Build stable release package
+        run: pnpm build
 
   ci-timings-summary:
     permissions:
