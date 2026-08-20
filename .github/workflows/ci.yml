@@ -2148,20 +2148,27 @@ jobs:
       - name: Verify governed stable release ancestry and version
         env:
           APPROVED_STABLE_SHA: 2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           test "$(node -p "require('./package.json').version")" = "2026.7.1"
-          # Single combined fetch keeps the commit graph connected: the shared
-          # checkout step above populated this repo with only a disconnected
-          # depth=1 tip at HEAD, so fetching APPROVED_STABLE_SHA on its own
-          # (also depth=1) produced a second, unrelated shallow tip and
-          # `merge-base --is-ancestor` could never succeed. Re-fetching HEAD's
-          # own SHA together with APPROVED_STABLE_SHA in one call, without a
-          # depth limit, brings in the connected history shared by both tips
-          # (mirrors the combined-fetch pattern in stable-release-gate.yml).
+          # The shared checkout step above leaves this repo shallow-grafted
+          # exactly at the candidate commit (a `--depth=1` fetch with no
+          # parent history). A follow-up fetch of the *same* SHA does not
+          # deepen it - git already has that object and will not re-derive
+          # its parents - so it can never connect to APPROVED_STABLE_SHA,
+          # regardless of true ancestry. Fetch into a fresh throwaway repo
+          # instead, exactly like stable-release-gate.yml's own ancestry
+          # check does, so there is no pre-existing shallow boundary to get
+          # in the way: one combined, depth-unlimited fetch of both the
+          # candidate and the approved SHA brings in their full shared
+          # history in a single connected graph.
           candidate_sha="$(git rev-parse HEAD)"
-          git fetch --no-tags --filter=blob:none origin "$candidate_sha" "$APPROVED_STABLE_SHA"
-          git merge-base --is-ancestor "$APPROVED_STABLE_SHA" HEAD
+          ancestry_dir="$RUNNER_TEMP/stable-release-ancestry"
+          git init "$ancestry_dir"
+          git -C "$ancestry_dir" remote add origin "https://github.com/${REPOSITORY}.git"
+          git -C "$ancestry_dir" fetch --no-tags --filter=blob:none origin "$candidate_sha" "$APPROVED_STABLE_SHA"
+          git -C "$ancestry_dir" merge-base --is-ancestor "$APPROVED_STABLE_SHA" "$candidate_sha"
       - name: Validate structured interim-status contract
         run: >-
           node scripts/run-vitest.mjs
